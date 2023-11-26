@@ -1,0 +1,57 @@
+import datetime
+start=datetime.datetime.now()
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsRegressor
+import numpy as np
+from pso_minmax import PSO
+from sklearn.model_selection import cross_val_score
+
+
+# 导入数据集
+data = pd.read_excel('E:/code/回归数据集.xlsx', sheet_name='有标签数据')
+
+# 分离输入和标签
+X = data.iloc[:, 0:6].values
+y = data.iloc[:, 6].values
+
+# 将数据集划分为训练集和测试集
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# 定义粒子群优化的适应度函数，计算测试集的cross_val_score
+def fitness_function(x):
+    x=round(x[0])
+    # 训练DT模型
+    clf = KNeighborsRegressor(n_neighbors = x)
+    # 计算准确率
+    result = np.mean(cross_val_score(clf, X_train , y_train , cv=10,scoring='neg_mean_squared_error'))
+    return result
+
+# 粒子群优化
+pso = PSO(func=fitness_function, dim=1, pop=5, max_iter=5, lb=[1], ub=[10], w=0.8, c1=0.5, c2=0.5)
+pso.run()
+print('best_max_depth is ', round(pso.gbest_x[0]))
+
+# 使用最佳超参数组合训练模型
+KNN = KNeighborsRegressor(n_neighbors = round(pso.gbest_x[0]))
+KNN.fit(X_train, y_train)
+
+# 再分别对训练集、预测集预测
+pred_y_train = KNN.predict(X_train)
+pred_y_test = KNN.predict(X_test)
+
+#输出预测结果
+writer = pd.ExcelWriter("E:/code/essemblelearning/Regress/results/KNN_result.xlsx")
+train_data = pd.DataFrame(X_train, columns=['input_1', 'input_2', 'input_3', 'input_4','input_5', 'input_6'])
+train_data['label'] = y_train
+train_data['prediction'] = pred_y_train
+test_data = pd.DataFrame(X_test, columns=['input_1', 'input_2', 'input_3', 'input_4','input_5', 'input_6'])
+test_data['label'] = y_test
+test_data['prediction'] = pred_y_test
+train_data.to_excel(writer,sheet_name='训练集结果',index = False)
+test_data.to_excel(writer,sheet_name='测试集结果',index = False)
+writer.close()
+
+#运行时间输出
+end=datetime.datetime.now()
+print('Running time: %s Seconds'%(end-start))
