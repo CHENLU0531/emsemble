@@ -1,0 +1,69 @@
+import datetime
+start=datetime.datetime.now()
+import pandas as pd
+import numpy as np
+from sklearn.metrics import r2_score
+import xgboost as xgb
+from sklearn.ensemble import RandomForestRegressor
+from lightgbm import LGBMRegressor
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import AdaBoostRegressor
+from catboost import CatBoostRegressor
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.svm import SVR
+from sklearn.gaussian_process import GaussianProcessRegressor
+from mlxtend.regressor import StackingCVRegressor
+# 导入数据集
+data = pd.read_excel('./data/data.xlsx', sheet_name='总数据集')
+# 分离输入和标签
+X = data.iloc[:, 1:10].values
+y = data.iloc[:, 10].values
+# 构建模型
+xgbB = xgb.XGBRegressor(n_estimators = 400,
+                        max_depth=2,
+                        learning_rate = 0.03,
+                        colsample_bytree=0.2,
+                        booster='gbtree',
+                        alpha=1
+                        )
+xgbB.fit(X, y)
+RF = RandomForestRegressor(n_estimators=200,max_depth = 5,max_features='sqrt')
+RF.fit(X, y)
+LGBM = LGBMRegressor(n_estimators = 750,
+                        max_depth=4,
+                        learning_rate = 0.02,
+                        boosting_type='gbdt'
+                        )
+LGBM.fit(X, y)
+AdaB = AdaBoostRegressor(DecisionTreeRegressor(max_depth=6,max_features='sqrt',min_samples_split=20, min_samples_leaf=5),
+                                                 n_estimators = 600,
+                                                 learning_rate = 0.1,
+                                                 loss='square'
+                                                 )
+AdaB.fit(X, y)
+CatB = CatBoostRegressor(iterations = 70,
+                        depth=3,
+                        learning_rate = 0.14,
+                        l2_leaf_reg=2,
+                        loss_function='RMSE',
+                        )
+CatB.fit(X, y)
+KNN = KNeighborsRegressor(n_neighbors = 5,algorithm='kd_tree')
+KNN.fit(X, y)
+
+'''ensemble'''
+model = [KNN,xgbB]
+stack_reg = StackingCVRegressor(regressors=model, meta_regressor=CatBoostRegressor(),cv=130,shuffle = True,use_features_in_secondary = False,n_jobs=-1)
+stack_mod = stack_reg.fit(X,y)
+pred_y_stack = stack_mod.predict(X)
+# pred_y_test_stack = stack_mod.predict(X_test)
+writer = pd.ExcelWriter("./results/ensemble_result.xlsx")
+#data = pd.DataFrame(X, columns=['input_1', 'input_2', 'input_3', 'input_4','input_5', 'input_6','input_7','input_8', 'input_9'])
+data = pd.DataFrame(X, columns=['input_1', 'input_2', 'input_3', 'input_4','input_5','input_6','input_7','input_8', 'input_9'])
+data['label'] = y
+data['stack_prediction'] = pred_y_stack
+data.to_excel(writer,sheet_name='集成结果',index = False)
+writer.close()
+end=datetime.datetime.now()
+print('Running time: %s Seconds'%(end-start))
