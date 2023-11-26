@@ -1,0 +1,90 @@
+import datetime
+start=datetime.datetime.now()
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import r2_score
+import xgboost as xgb
+import numpy as np
+from pso_minmax import PSO
+from sklearn.model_selection import cross_val_score
+
+# 导入数据集
+train_data = pd.read_excel('./data/data.xlsx', sheet_name='训练集')
+test_data = pd.read_excel('./data/data.xlsx', sheet_name='测试集')
+
+# 分离输入和标签
+X_train = train_data.iloc[:, 1:10].values
+y_train = train_data.iloc[:, -1].values
+X_test = test_data.iloc[:, 1:10].values
+y_test = test_data.iloc[:, -1].values
+
+# 归一化
+# scaler= MinMaxScaler()
+# X_train = scaler.fit_transform(X_train)
+# X_test = scaler.fit_transform(X_test)
+
+#随机划分训练集和测试集
+# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# # 定义粒子群优化的适应度函数，计算测试集的cross_val_score
+# def fitness_function(x):
+#     x1,x2,x3,x4=x
+#     # 训练AdaBoost模型
+#     clf = xgb.XGBRegressor(n_estimators = round(x1),max_depth=round(x2),learning_rate = x3,colsample_bytree=x4,booster='gbtree',alpha=1)
+#     # 计算准确率
+#     result = np.sum(cross_val_score(clf, X_train , y_train , cv=10,scoring='neg_mean_squared_error'))
+#     return result
+#
+# # 粒子群优化
+# pso = PSO(func=fitness_function, dim=4, pop=10, max_iter=10, lb=[100,1,0.001,0.5],ub=[500,10,1,1], w=0.8, c1=0.5, c2=0.5)
+# pso.run()
+# print('best_n_estimators is ', round(pso.gbest_x[0]),'best_max_depth is', round(pso.gbest_x[1]),'best_learning_rate is', pso.gbest_x[2]
+#       ,'best_colsample_bytree is', pso.gbest_x[3])
+#
+# # 使用最佳超参数组合训练模型
+# xgbB = xgb.XGBRegressor(n_estimators = round(pso.gbest_x[0]),
+#                         max_depth=round(pso.gbest_x[1]),
+#                         learning_rate = pso.gbest_x[2],
+#                         colsample_bytree=pso.gbest_x[3],
+#                         booster='gbtree',
+#                         alpha=1
+#                         )
+xgbB = xgb.XGBRegressor(n_estimators = 400,
+                        max_depth=5,
+                        learning_rate = 0.1,
+                        colsample_bytree=0.6,
+                        booster='gbtree',
+                        alpha=1
+                        )
+xgbB.fit(X_train, y_train)
+# xgb.fit(X, y)
+# 再分别对训练集、预测集预测
+pred_y_train = xgbB.predict(X_train)
+pred_y_test = xgbB.predict(X_test)
+# 反归一化
+# X_train = scaler.inverse_transform(X_train)
+# X_test = scaler.inverse_transform(X_test)
+#输出预测结果
+writer = pd.ExcelWriter("./results/XGBoost_result.xlsx")
+train_data = pd.DataFrame(X_train, columns=['input_1', 'input_2', 'input_3', 'input_4','input_5', 'input_6','input_7','input_8', 'input_9'])
+train_data['label'] = y_train
+train_data['prediction'] = pred_y_train
+test_data = pd.DataFrame(X_test, columns=['input_1', 'input_2', 'input_3', 'input_4','input_5', 'input_6','input_7','input_8', 'input_9'])
+test_data['label'] = y_test
+test_data['prediction'] = pred_y_test
+train_data.to_excel(writer,sheet_name='训练集结果',index = False)
+test_data.to_excel(writer,sheet_name='测试集结果',index = False)
+writer.close()
+
+# data = pd.DataFrame(X, columns=['input_1', 'input_2', 'input_3', 'input_4','input_5', 'input_6'])
+# data['label'] = y
+# data['prediction'] = pred_y
+# data.to_excel(writer,sheet_name='xgboost 结果',index = False)
+# writer.close()
+
+#运行时间输出
+end=datetime.datetime.now()
+print('Running time: %s Seconds'%(end-start))
+print("训练集 r2 score:", r2_score(y_train, pred_y_train))
+print("测试集 r2 score:", r2_score(y_test, pred_y_test))
